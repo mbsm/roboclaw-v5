@@ -4,6 +4,7 @@ import struct
 import time
 
 _trystimeout = 3
+_verifyChecksum = False
 
 #Command Enums
 
@@ -290,8 +291,36 @@ def _read_n(address,cmd,args):
 	return (0,0,0,0,0)
 
 def _writechecksum():
+	"""Write checksum
+
+	Technically, we shouldn't do this, and we should use
+	SpeedM1M2 instead. But, since we wrote our code to be abstract;
+	and since it's late and I'm tired, I'm going to do it anyways.
+
+	Turning this off is good because pySerial will block otherwise.
+	This means that each motor will turn on with a delay.
+
+	Other possible solutions to this without changing this library:
+	1) Decrease the timeout value
+	2) Figure out a way to fork pySerial calls so they don't block
+	   and you can move on to other calls
+	3) Use SpeedM1M2 and figure out a good way to both abstract it out
+	   but still know which body frame motors go to which RoboClaws
+
+
+	But for now, who cares. I'm doing it anyways.
+
+	See https://github.com/plusk01/roboclaw-v3, roboclaw.py:288 for
+	more information on why this is necessary.
+
+	"""
 	global _crc
 	_writeword(_crc&0xFFFF)
+
+	# Should I just bail without waiting for a response?
+	if not _verifyChecksum:
+		return True
+
 	val = _readbyte()
 	if val[0]:
 		return True
@@ -1031,8 +1060,10 @@ def SetPWMMode(address,mode):
 def ReadPWMMode(address):
 	return _read1(address,Cmd.GETPWMMODE)
 
-def Open(comport, rate):
+def Open(comport, rate, verifyChecksum=True):
 	global port
 	port = serial.Serial(comport, baudrate=rate, timeout=0.1, interCharTimeout=0.01)
-	return
 
+	global _verifyChecksum
+	_verifyChecksum = verifyChecksum
+	return
